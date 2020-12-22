@@ -2,8 +2,9 @@
 
 The Custom Audio Device sample application shows how to use a custom audio
 device in your application. A custom audio device lets you implement your own
-way of either capturing or rendering audio or both. It is important to note that
-only a custom audio device can be set at a time in an application.
+way of either capturing or rendering audio or both. However this sample only 
+deals with saving audio from a video session to local file.It is important 
+to note that only a custom audio device can be set at a time in an application.
 
 You will need a valid [Vonage Video API](https://tokbox.com/developer/)
 account to build this app. (Note that OpenTok is now the Vonage Video API.)
@@ -75,7 +76,7 @@ Use `make` to build the code:
 $ make
 ```
 
-When the `custom_audio_device` binary is built, run it:
+When the `vonage_custom_renderer` binary is built, run it:
 
 ```bash
 $ ./vonage_custom_renderer
