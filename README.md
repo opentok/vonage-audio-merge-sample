@@ -29,23 +29,13 @@ package. For Debian we support Debian 9 (strech) and 10 (buster). We maintain
 our own Debian repository on Bintray. For Debian 10, follow these steps
 to install the packages from our repository.
 
-* Add a new entry to your `/etc/apt/sources.list` file.
+* Add packagecloud repo
 
 ```bash
-echo "deb https://dl.bintray.com/tokbox/debian buster main" | sudo tee -a /etc/apt/sources.list
+curl -s https://packagecloud.io/install/repositories/tokbox/debian/script.deb.sh | sudo bash
 ```
 
-* Add Bintray's GPG Key.
 
-```bash
-wget -O- -q https://bintray.com/user/downloadSubjectPublicKey?username=bintray | sudo apt-key add -
-```
-
-* Resynchronize the package index files from their sources.
-
-```bash
-sudo apt-get update
-```
 
 * Install the OpenTok Linux SDK packages.
 
