@@ -127,7 +127,7 @@ If it is, we write the floor audio to the `translator_audio.pcm` as well.
 - Initalizing each session connections (loop through the struct array)
 - ```on_subscriber_audio_data``` should check for each member of the array and apply the translator muted logic to each translator found
 
-##Sample Audio
+## Sample Audio
 
 There is a floor_audio.pcm and a translator_audio.pcm sample inside /sample_audio_output
 Note that these are raw PCM files, when opening, use an audio editor like Audacity to set these parameters
