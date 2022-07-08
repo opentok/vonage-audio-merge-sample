@@ -15,8 +15,17 @@ static std::atomic<bool> g_is_connected(false);
 //Define our floor and translator audio files
 FILE *floor_audio_out;
 FILE *translator_audio_out;
+FILE *floor_video_out;
+
+//Set Session 1 resolution
+char *floor_resolution = "640x480";
+char *video_ouput_name = "video_floor.mp4";
+//store ffmpeg command here
+char command[256];
 
 bool translator_has_audio = true;
+
+
 struct audio_device {
   otc_audio_device_callbacks audio_device_callbacks;
   otk_thread_t renderer_thread;
@@ -84,12 +93,7 @@ static void on_subscriber_connected(otc_subscriber *subscriber,
                                     void *user_data,
                                     const otc_stream *stream) {
   std::cout << __FUNCTION__ << " callback function" << std::endl;
-  otc_subscriber_set_subscribe_to_video(subscriber,0);
-}
-
-static void on_subscriber_render_frame(otc_subscriber *subscriber,
-                                       void *user_data,
-                                       const otc_video_frame *frame) {
+  //otc_subscriber_set_subscribe_to_video(subscriber,0);
 }
 
 static void on_subscriber_error(otc_subscriber* subscriber,
@@ -100,27 +104,54 @@ static void on_subscriber_error(otc_subscriber* subscriber,
   std::cout << "Subscriber error. Error code: " << error_string << std::endl;
 }
 
+
+static void on_subscriber_render_frame(otc_subscriber *subscriber, 
+                        void *user_data,
+                        const otc_video_frame *frame){
+
+  int width = otc_video_frame_get_width(frame);
+  int height = otc_video_frame_get_height(frame);
+  otc_session *ses = otc_subscriber_get_session(subscriber);
+  char *session_id = otc_session_get_id(ses);
+
+  uint8_t* buffer = (uint8_t*)otc_video_frame_get_buffer(frame);
+  size_t buffer_size = otc_video_frame_get_buffer_size(frame);
+ 
+  if ( strcmp(session_id, SESSION_ID) == 0){
+    
+    std::cout << "Video Writing, to Video File: " << width <<"x"<<height <<  std::endl;
+
+    //write to ffmpeg pipe
+    fwrite(buffer, 1,
+          buffer_size,floor_video_out);
+    
+  }
+}
+
 static void on_subscriber_audio_data(otc_subscriber* subscriber,
                         void* user_data,
                         const struct otc_audio_data* audio_data){
   otc_stream *stream = otc_subscriber_get_stream(subscriber);
-  
-  if ( strcmp(otc_session_get_id(otc_subscriber_get_session(subscriber)), SESSION_ID) ==0 ){
-
+  // otc_session_get_id(otc_subscriber_get_session(subscriber));
+  // otc_stream_has_audio(stream);
+  otc_session *ses = otc_subscriber_get_session(subscriber);
+  char *session_id = otc_session_get_id(ses);
+  if ( strcmp(session_id, SESSION_ID) == 0 ){
+    
     fwrite(audio_data->sample_buffer, sizeof(audio_data->sample_rate),audio_data->number_of_samples,floor_audio_out);
 
     //Translator is muted, let's write floor to audio 2
     if(!translator_has_audio){
-      fwrite(audio_data->sample_buffer, sizeof(audio_data->sample_rate),audio_data->number_of_samples,translator_audio_out);
-      std::cout << "Muted Translator Audio, Writing Floor Audio to Translator File " << std::endl;
+      //fwrite(audio_data->sample_buffer, sizeof(audio_data->sample_rate),audio_data->number_of_samples,translator_audio_out);
+      //std::cout << "Muted Translator Audio, Writing Floor Audio to Translator File " << std::endl;
     }
   
   } 
-  if ( strcmp(otc_session_get_id(otc_subscriber_get_session(subscriber)), SESSION_ID_2) ==0 ){
-     if (otc_stream_has_audio(stream)){
+  if ( strcmp(session_id, SESSION_ID_2) ==0 ){
+    if (otc_stream_has_audio(stream)){
       //The stream is not muted, let's mark our translator audio state to true
       translator_has_audio = true;
-      std::cout << "Active Translator Audio Writing, to Translator File " << std::endl;
+      //std::cout << "Active Translator Audio Writing, to Translator File " << std::endl;
       fwrite(audio_data->sample_buffer, sizeof(audio_data->sample_rate),audio_data->number_of_samples,translator_audio_out);
     }else{
       //let's mark our translator audio state to false
@@ -162,7 +193,7 @@ static void on_session_stream_received(otc_session *session,
   subscriber_callbacks.on_audio_data = on_subscriber_audio_data;
 
   otc_subscriber *subscriber = otc_subscriber_new(stream,&subscriber_callbacks);
-  otc_subscriber_set_subscribe_to_video(subscriber,0);
+  //otc_subscriber_set_subscribe_to_video(subscriber,1);
  
   if (otc_session_subscribe(session, subscriber) == OTC_SUCCESS) {
     printf("subscribed successfully\n");
@@ -202,6 +233,13 @@ void sigfun(int sig)
 }
 
 int main(int argc, char** argv) {
+  sprintf(command, "ffmpeg -y -f rawvideo -vcodec rawvideo -pix_fmt yuv420p -s %s -r 25 -i - -f mp4 -q:v 5 -an -vf scale=1280x720 -vcodec mpeg4  %s", floor_resolution, video_ouput_name);
+  floor_video_out = popen(command, "w");
+  //Create a pipe to ffmpeg so out YUV frames gets converted to mpeg4 right away
+  //ON Production, make sure resolution (-s 640x480) is handled correctly, 
+  //if it is dynamic, on change, you need to restart ffmpeg and save to another file or append to created file (needs to be same output file)
+  std::cout<<"ffmpeg" << command<<std::endl;
+  
   if (otc_init(nullptr) != OTC_SUCCESS) {
     std::cout << "Could not init OpenTok library" << std::endl;
     return EXIT_FAILURE;
@@ -221,6 +259,8 @@ int main(int argc, char** argv) {
 	printf("Error opening audio output file\n");
 	exit(1);
   }
+
+
 
   //Explore later to write WAV so SR BD and CH will be set automatically
   // short NumChannels = 2;
@@ -277,15 +317,15 @@ int main(int argc, char** argv) {
 
   otc_session_connect(session, TOKEN);
 
-  otc_session *session2 = nullptr;
-  session2 = otc_session_new(API_KEY_2, SESSION_ID_2, &session_callbacks);
+  // otc_session *session2 = nullptr;
+  // session2 = otc_session_new(API_KEY_2, SESSION_ID_2, &session_callbacks);
 
-  if (session2 == nullptr) {
-    std::cout << "Could not create OpenTok session successfully" << std::endl;
-    return EXIT_FAILURE;
-  }
+  // if (session2 == nullptr) {
+  //   std::cout << "Could not create OpenTok session successfully" << std::endl;
+  //   return EXIT_FAILURE;
+  // }
 
-  otc_session_connect(session2, TOKEN_2);
+  // otc_session_connect(session2, TOKEN_2);
 
   while(1){
 	  sleep(1);
