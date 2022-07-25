@@ -10,6 +10,12 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <time.h>
+long int begin_timestamp = 0;
+int frame_count = 0;
+struct timeval tp;
+
+
 static std::atomic<bool> g_is_connected(false);
 
 //Define our floor and translator audio files
@@ -118,13 +124,24 @@ static void on_subscriber_render_frame(otc_subscriber *subscriber,
   size_t buffer_size = otc_video_frame_get_buffer_size(frame);
  
   if ( strcmp(session_id, SESSION_ID) == 0){
-    
-    std::cout << "Video Writing, to Video File: " << width <<"x"<<height <<  std::endl;
+   
+    //Calculate current FPS
 
+    //set stuct tp to milliseconds since epoch
+    gettimeofday(&tp, NULL);
+    long int current_timestamp = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+    //calculate difference between start begin_time and current_time
+    float time_spent = float(current_timestamp - begin_timestamp);
+
+    float fps = (frame_count/time_spent)*1000;
+    std::cout << "Video Writing, to Video File: " << width <<"x"<<height <<  std::endl;
+    std::cout << "Frames Received: "<< frame_count << " Time Spent (s): " << time_spent/1000 << " FPS: "<< fps << std::endl;
+    frame_count++;
     //write to ffmpeg pipe
     fwrite(buffer, 1,
           buffer_size,floor_video_out);
     
+   
   }
 }
 
@@ -184,6 +201,11 @@ static void on_session_connection_dropped(otc_session *session,
 static void on_session_stream_received(otc_session *session,
                                        void *user_data,
                                        const otc_stream *stream) {
+
+  //let's set the beginning time for our elapsed time counter for fps
+  gettimeofday(&tp, NULL);
+  begin_timestamp = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+
   std::cout << __FUNCTION__ << " callback function" << std::endl;
   struct otc_subscriber_callbacks subscriber_callbacks = {0};
   subscriber_callbacks.user_data = user_data;
